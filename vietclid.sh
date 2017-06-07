@@ -12,7 +12,7 @@ email='webmaster@localhost'
 #sitesEnable='/etc/apache2/sites-enabled/'
 #sitesAvailable='/etc/apache2/sites-available/'
 userDir='/var/www/'
-rootDockerBridgeIp='172.17.0.1'
+vietclidNet='vietclidNet'
 vietclidNetIp='172.18.0.1'
 #sitesAvailabledomain=$sitesAvailable$domain.conf
 
@@ -65,50 +65,31 @@ fi
 rootDir=$userDir$rootDir
 
 ### get available IP
-if ping -c1 -w3 $rootDockerBridgeIp >/dev/null 2>&1
+
+if ! ping -c1 -w3 $vietclidNetIp >/dev/null 2>&1
 then
+        ##echo "Ping did not respond; IP address either free or firewalled" >&2
+        docker network create --subnet=172.18.0.0/16 $vietclidNet
+        dockerContainerIp="172.18.0.2"
+        dockerContainerNet=$vietclidNet
+else
     i=2
     while (( i <= 100 ))
     do
-            if grep -qs "172.17.0.$i" /etc/hosts
+            if ! grep -qs "172.18.0.$i" /etc/hosts;
             then
-                dockerContainerIp = "172.17.0.$i"
-                dockerContainerNet = 'bridge'
-                i = 100
+                dockerContainerIp="172.18.0.$i"
+                dockerContainerNet=$vietclidNet
+                i=100
             fi
             i=$((i + 1))
     done
-
-else
-    if ping -c1 -w3 $vietclidNetIp >/dev/null 2>&1
-    then
-        i=2
-        while (( i <= 100 ))
-        do
-                if grep -qs "172.18.0.$i" /etc/hosts
-                then
-                    dockerContainerIp = "172.18.0.$i"
-                    dockerContainerNet = 'vietclidNet'
-                    i = 100
-                fi
-                i=$((i + 1))
-        done
-
-    else
-        ##echo "Ping did not respond; IP address either free or firewalled" >&2
-        docker network create --subnet=172.18.0.0/16 vietclidNet
-        dockerContainerIp = "172.18.0.2"
-        dockerContainerNet = 'vietclidNet'
-
-    fi
-
 fi
-
 
 if [ "$action" == 'create' ]
 	then
 		### check if domain already exists
-        if grep -qs $domain /etc/hosts
+        if grep -qs $domain /etc/hosts;
         then
 			echo -e $"This domain already exists.\nPlease Try Another one"
 			exit;
@@ -132,7 +113,9 @@ if [ "$action" == 'create' ]
 		fi
 
 		### create docker container
-		id=$(docker run --net $dockerContainerNet --ip $dockerContainerIp --name $domain -d vietcli/centos:php56)
+		id=$(docker run --net $dockerContainerNet --ip $dockerContainerIp -v $rootDir:/var/www --name $domain -d vietduong/vietcli-centos-image)
+		echo -e $"[RUNNING] docker run --net $dockerContainerNet --ip $dockerContainerIp -v $rootDir:/var/www --name $domain -d vietduong/vietcli-centos-image "
+
         if ! docker top $id &>/dev/null
 		then
 			echo -e $"There is an ERROR creating $domain container"
@@ -151,9 +134,20 @@ if [ "$action" == 'create' ]
 		fi
 
 		if [ "$owner" == "" ]; then
-			chown -R $(whoami):$(whoami) $rootDir
+
+		    if [ $SUDO_USER ];
+		    then
+                chown -R $SUDO_USER:$SUDO_USER $rootDir
+                echo -e $"Set owner by SUDO_USER with value $SUDO_USER for $rootDir \n"
+            elif [ $(whoami) ];
+            then
+                chown -R $(whoami):$(whoami) $rootDir
+                echo -e $"Set owner by whoami with value $(whoami) for $rootDir \n"
+		    fi
+
 		else
 			chown -R $owner:$owner $rootDir
+			echo -e $"Set owner by owner with value $owner for $rootDir \n"
 		fi
 
 		### show the finished message
