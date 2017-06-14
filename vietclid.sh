@@ -113,7 +113,7 @@ if [ "$action" == 'create' ]
 		fi
 
 		### create docker container
-		id=$(docker run --net $dockerContainerNet --ip $dockerContainerIp -v $rootDir:/var/www --name $domain -d vietduong/vietcli-centos-image)
+		id=$(docker run --net $dockerContainerNet --ip $dockerContainerIp -v $rootDir:/home/vietcli/files --name $domain -d vietduong/centos-nginx-phpfpm)
 		echo -e $"[RUNNING] docker run --net $dockerContainerNet --ip $dockerContainerIp -v $rootDir:/var/www --name $domain -d vietduong/vietcli-centos-image "
 
         if ! docker top $id &>/dev/null
@@ -131,6 +131,8 @@ if [ "$action" == 'create' ]
 			exit;
 		else
 			echo -e $"Host added to /etc/hosts file \n"
+			echo -e $"Now you can access by default with account vietcli (pass: vietcli) \n"
+			echo -e $"ssh vietcli@$dockerContainerIp \n"
 		fi
 
 		if [ "$owner" == "" ]; then
