@@ -99,22 +99,24 @@ if [ "$action" == 'create' ]
 		if ! [ -d $rootDir ]; then
 			### create the directory
 			mkdir $rootDir
+			mkdir $rootDir/html
 			### give permission to root dir
 			chmod 755 $rootDir
 			chown $USER:$USER $rootDir
 			### write test file in the new domain dir
-			if ! echo "<?php echo phpinfo(); ?>" > $rootDir/vietcli.php
+			if ! echo "<?php echo phpinfo(); ?>" > $rootDir/html/phpinfo.php
 			then
-				echo $"ERROR: Not able to write in file $rootDir/vietcli.php. Please check permissions"
+				echo $"ERROR: Not able to write in file $rootDir/html/phpinfo.php. Please check permissions"
 				exit;
 			else
-				echo $"Added content to $rootDir/vietcli.php"
+			    echo "<h1>VietCLID Default Site</h1><h3>VietCLID has just created this site!</h3>" > $rootDir/html/index.html
+				echo $"Added content to $rootDir/html/vietcli.php"
 			fi
 		fi
 
 		### create docker container
 		id=$(docker run --net $dockerContainerNet --ip $dockerContainerIp -v $rootDir:/home/vietcli/files --name $domain -d vietduong/centos-nginx-phpfpm)
-		echo -e $"[RUNNING] docker run --net $dockerContainerNet --ip $dockerContainerIp -v $rootDir:/var/www --name $domain -d vietduong/vietcli-centos-image "
+		echo -e $"[RUNNING] docker run --net $dockerContainerNet --ip $dockerContainerIp -v $rootDir:/home/vietcli/files --name $domain -d vietduong/centos-nginx-phpfpm "
 
         if ! docker top $id &>/dev/null
 		then
@@ -153,7 +155,7 @@ if [ "$action" == 'create' ]
 		fi
 
 		### show the finished message
-		echo -e $"Complete! \nYou now have a new Virtual Host \nYour new host is: http://$domain \nAnd its located at $rootDir"
+		echo -e $"Complete! \nYou now have a new Docker Container Host \nYour new host is: http://$domain \nAnd its located at $rootDir"
 		exit;
 
 	elif [ "$action" == 'ifconfig' ]
