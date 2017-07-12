@@ -11,7 +11,7 @@ owner=$(who am i | awk '{print $1}')
 email='webmaster@localhost'
 #sitesEnable='/etc/apache2/sites-enabled/'
 #sitesAvailable='/etc/apache2/sites-available/'
-userDir='/var/www/'
+userDir=$"/home/$SUDO_USER/www/"
 vietclidNet='vietclidNet'
 vietclidNetIp='172.18.0.1'
 #sitesAvailabledomain=$sitesAvailable$domain.conf
@@ -23,9 +23,9 @@ if [ "$(whoami)" != 'root' ]; then
 		exit 1;
 fi
 
-if [ "$action" != 'create' ] && [ "$action" != 'delete' ] && [ "$action" != 'ifconfig' ]
+if [ "$action" != 'create' ] && [ "$action" != 'createmage2' ] && [ "$action" != 'delete' ] && [ "$action" != 'ifconfig' ]
 	then
-		echo $"You need to prompt for action (create or delete) -- Lower-case only"
+		echo $"You need to prompt for action (create, createmage2, ifconfig or delete) -- Lower-case only"
 		exit 1;
 fi
 
@@ -86,7 +86,7 @@ else
     done
 fi
 
-if [ "$action" == 'create' ]
+if [ "$action" == 'create' ] || [ "$action" == 'createmage2' ]
 	then
 		### check if domain already exists
         if grep -qs $domain /etc/hosts;
@@ -115,8 +115,15 @@ if [ "$action" == 'create' ]
 		fi
 
 		### create docker container
-		id=$(docker run --net $dockerContainerNet --ip $dockerContainerIp -v $rootDir:/home/vietcli/files --name $domain -d vietduong/centos-nginx-phpfpm)
-		echo -e $"[RUNNING] docker run --net $dockerContainerNet --ip $dockerContainerIp -v $rootDir:/home/vietcli/files --name $domain -d vietduong/centos-nginx-phpfpm "
+		if ["$action" == 'create']
+		then
+		    id=$(docker run --net $dockerContainerNet --ip $dockerContainerIp -v $rootDir:/home/vietcli/files --name $domain -d vietduong/centos-nginx-phpfpm)
+    		echo -e $"[RUNNING] docker run --net $dockerContainerNet --ip $dockerContainerIp -v $rootDir:/home/vietcli/files --name $domain -d vietduong/centos-nginx-phpfpm "
+		else
+            id=$(docker run --net $dockerContainerNet --ip $dockerContainerIp -v $rootDir:/home/vietcli/files --name $domain -d vietduong/centos-nginx-phpfpm-for-mage2)
+    		echo -e $"[RUNNING] docker run --net $dockerContainerNet --ip $dockerContainerIp -v $rootDir:/home/vietcli/files --name $domain -d vietduong/centos-nginx-phpfpm-for-mage2 "
+		fi
+
 
         if ! docker top $id &>/dev/null
 		then
