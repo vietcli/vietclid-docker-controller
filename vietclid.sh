@@ -117,7 +117,20 @@ fi
 if [ ! "$(docker ps -a | grep ${vietclidDatabaseContainerName})" ]; then
     ### Create a docker container for default DB Server
     echo -e $"[RUNNING] Vietclid Database Server was created from $databaseImage docker image with name $vietclidDatabaseContainerName , IP vietclidDatabaseContainerIP and root password $vietclidDefaultPassword \n"
-    docker run --net $dockerContainerNet --ip $vietclidDatabaseContainerIP  --name $vietclidDatabaseContainerName -e MYSQL_ROOT_PASSWORD=$vietclidDefaultPassword -d $databaseImage
+
+    ## Create database log folder
+    databaseServerLogDir=$"$userLogDir/$vietclidDatabaseContainerName"
+    mkdir $databaseServerLogDir
+    chmod 755 -R $databaseServerLogDir
+    chown $SUDO_USER:$SUDO_USER -R $databaseServerLogDir
+
+    ## Create database database folder
+    databaseServerStorageDir=$"$userDir/data"
+    mkdir $databaseServerStorageDir
+    chmod 755 -R $databaseServerStorageDir
+    chown $SUDO_USER:$SUDO_USER -R $databaseServerStorageDir
+
+    docker run --net $dockerContainerNet --ip $vietclidDatabaseContainerIP  --name $vietclidDatabaseContainerName -v $databaseServerStorageDir:/var/lib/mysql  -e MYSQL_ROOT_HOST_FILE=$databaseServerLogDir/mysql-root-host -e MYSQL_ROOT_PASSWORD_FILE=$databaseServerLogDir/mysql-root -e MYSQL_ROOT_PASSWORD=$vietclidDefaultPassword -d $databaseImage
     echo -e $"Connect by SSH: mysql -h$vietclidDatabaseContainerIP -P3306 -uroot -p"$vietclidDefaultPassword" \n"
 fi
 
