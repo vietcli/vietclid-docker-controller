@@ -7,6 +7,9 @@ rootDir=$3
 owner=$(who am i | awk '{print $1}')
 email='webmaster@lvietclidbocalhost'
 userDir=$"/home/$SUDO_USER/vietclid/"
+userDataDir=$"/home/$SUDO_USER/vietclid/data"
+userLogDir=$"/home/$SUDO_USER/vietclid/log"
+userConfigurationDir=$"/home/$SUDO_USER/vietclid/conf.d"
 vietclidDefaultPassword='vietcli'
 vietclidNet='vietclidNet'
 vietclidNetIp='172.18.0.1'
@@ -19,23 +22,37 @@ databaseImage='mysql:latest'
 
 ### don't modify from here unless you know what you are doing ####
 
+
+## Step 1 ##
+echo $"[Step 1] Check root permission"
+
 if [ "$(whoami)" != 'root' ];
 then
     echo $"You have no permission to run $0 as non-root user. Use sudo"
     exit 1;
 fi
 
+## Step 2 ##
+echo $"[Step 2] Check action request"
+
 if [ "$action" != 'create' ] && [ "$action" != 'delete' ] && [ "$action" != 'ifconfig' ]; then
     echo $"You need to prompt for action (create, createmage2, ifconfig or delete) -- Lower-case only"
     exit 1;
 fi
+
+
+## Step 3 ##
+echo $"[Step 3] Check docker if installed"
 
 ###Check if docker was installed###
 which docker
 
 if [ $? -ne 0 ]
 then
-    echo $"You need to install docker before try again"
+    echo $"You need to install docker before try again \n"
+    echo $"Installing docker by below:\n"
+    echo $"sudo apt-get install docker.io \n"
+    echo $"sudo usermod -aG docker $(whoami) \n"
     exit 1;
 else
     docker --version | grep "Docker version"
@@ -45,6 +62,27 @@ else
         echo $"You need to install docker before try again"
         exit 1;
     fi
+
+    ## Set docker permission for current user
+    usermod -aG docker $SUDO_USER
+
+
+fi
+
+## Step 3 ##
+echo $"[Step 4] Check mysql if installed \n"
+
+### Check if mysql is installed ###
+if ! type mysql >/dev/null 2>&1; then
+    echo $"You need to install mysql before try again. \n"
+    exit 1;
+
+fi
+
+## Install pwgen to generate random password
+
+if ! which pwgen > /dev/null; then
+    apt-get install pwgen
 fi
 
 while [ "$domain" == "" ]
@@ -95,8 +133,13 @@ then
     mkdir $userDir
 
     ### Create a directory for log
-    userLogDir=$"$userDir/log"
     mkdir $userLogDir
+
+    ### Create a directory for data
+    mkdir $userDataDir
+
+    ### Create a directory for configuration
+    mkdir $userConfigurationDir
 
     ### give permission to root dir
     chmod 755 -R $userDir
@@ -110,23 +153,74 @@ fi
 
 if [ ! "$(docker ps -a | grep ${vietclidDatabaseContainerName})" ];
 then
-    ### Create a docker container for default DB Server
-    echo -e $"[RUNNING] Vietclid Database Server was created from $databaseImage docker image with name $vietclidDatabaseContainerName , IP vietclidDatabaseContainerIP and root password $vietclidDefaultPassword \n"
+    echo -e $"[RUNNING] Creating database server container \n"
 
     ## Create database log folder
-    databaseServerLogDir=$"$userLogDir/$vietclidDatabaseContainerName"
-    mkdir $databaseServerLogDir
-    chmod 755 -R $databaseServerLogDir
-    chown $SUDO_USER:$SUDO_USER -R $databaseServerLogDir
+    databaseServerLogDir=$"${userLogDir}/${vietclidDatabaseContainerName}"
 
-    ## Create database database folder
-    databaseServerStorageDir=$"$userDir/data"
-    mkdir $databaseServerStorageDir
-    chmod 755 -R $databaseServerStorageDir
-    chown $SUDO_USER:$SUDO_USER -R $databaseServerStorageDir
+    if [ ! -d "$databaseServerLogDir" ]; then
+        mkdir $databaseServerLogDir
 
-    docker run --net $dockerContainerNet --ip $vietclidDatabaseContainerIP  --name $vietclidDatabaseContainerName -v $databaseServerStorageDir:/var/lib/mysql  -e MYSQL_ROOT_HOST_FILE=$databaseServerLogDir/mysql-root-host -e MYSQL_ROOT_PASSWORD_FILE=$databaseServerLogDir/mysql-root -e MYSQL_ROOT_PASSWORD=$vietclidDefaultPassword -d $databaseImage
-    echo -e $"Connect by SSH: mysql -h$vietclidDatabaseContainerIP -P3306 -uroot -p"$vietclidDefaultPassword" \n"
+        chmod 755 -R $databaseServerLogDir
+        chown $SUDO_USER:$SUDO_USER -R $databaseServerLogDir
+
+    fi
+
+    ## Create database data folder
+    databaseServerDataDir=$"${userDataDir}/${vietclidDatabaseContainerName}"
+
+    if [ ! -d "$databaseServerDataDir" ]; then
+        mkdir $databaseServerDataDir
+
+        chmod 755 -R $databaseServerDataDir
+        chown $SUDO_USER:$SUDO_USER -R $databaseServerDataDir
+
+    fi
+
+    ## Create database configuration folder
+    databaseServerConfigurationDir=$"${userConfigurationDir}/${vietclidDatabaseContainerName}"
+
+    if [ ! -d "$databaseServerConfigurationDir" ]; then
+        mkdir $databaseServerConfigurationDir
+
+        cat > $databaseServerConfigurationDir/vietcli.cnf << "EOF"
+[mysqld]
+innodb_data_file_path = ibdata1:10M:autoextend:max:1024M
+tmp_table_size = 1024M
+max_heap_table_size = 1024M
+EOF
+
+        chmod 755 -R $databaseServerConfigurationDir
+        chown $SUDO_USER:$SUDO_USER -R $databaseServerConfigurationDir
+
+    fi
+
+
+    ### Create a docker container for default DB Server
+
+    echo -e $"Use default password for root (default password: $vietclidDefaultPassword)? (y/n)"
+    read useDefaultPassword
+
+    if [ "$useDefaultPassword" == 'y' -o "$useDefaultPassword" == 'Y' ]; then
+        mysqlRootPassword=$vietclidDefaultPassword
+
+    else
+        ROOT_PASSWORD=`pwgen -c -n -1 12`
+        mysqlRootPassword=ROOT_PASSWORD
+        #This is so the passwords show up in logs.
+        echo root password: $ROOT_PASSWORD
+
+    fi
+
+    ### Create docker container
+    docker run --restart=always --net $dockerContainerNet --ip $vietclidDatabaseContainerIP  --name $vietclidDatabaseContainerName -v $databaseServerConfigurationDir:/etc/mysql/conf.d -v $userDataDir:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=$mysqlRootPassword -d $databaseImage
+
+    #Write root password to log
+    echo $mysqlRootPassword > $databaseServerLogDir/mysql-root-pw.txt
+
+    echo -e $"[RUNNING] root password was written on ${databaseServerLogDir}/mysql-root-pw.txt \n"
+    echo -e $"Connect by SSH: mysql -h$vietclidDatabaseContainerIP -P3306 -uroot -p"$mysqlRootPasswordl" \n"
+
 fi
 
 if [ "$action" == 'create' ]
@@ -134,7 +228,7 @@ then
     ### check if domain already exists
     if grep -qs $domain /etc/hosts;
     then
-        echo -e $"This domain already exists.\nPlease Try Another one"
+        echo -e $"This domain already exists on /etc/hosts file.\nPlease Try Another one"
         exit;
     fi
 
@@ -235,7 +329,7 @@ else
     ### check whether domain already exists
     if ! grep -qs $domain /etc/hosts
     then
-        echo -e $"This domain does not exist.\nPlease try another one"
+        echo -e $"This domain does not exist on /etc/hosts file.\nPlease try another one"
         exit;
     else
         ### Delete domain in /etc/hosts
