@@ -188,6 +188,7 @@ then
 innodb_data_file_path = ibdata1:10M:autoextend:max:1024M
 tmp_table_size = 1024M
 max_heap_table_size = 1024M
+explicit_defaults_for_timestamp = 1
 EOF
 
         chmod 755 -R $databaseServerConfigurationDir
@@ -198,7 +199,7 @@ EOF
 
     ### Create a docker container for default DB Server
 
-    echo -e $"Use default password for root (default password: $vietclidDefaultPassword)? (y/n)"
+    echo -e $"-------------------------|Use default password for root (default password: $vietclidDefaultPassword)? (y/n)"
     read useDefaultPassword
 
     if [ "$useDefaultPassword" == 'y' -o "$useDefaultPassword" == 'Y' ]; then
@@ -213,13 +214,13 @@ EOF
     fi
 
     ### Create docker container
-    docker run --restart=always --net $dockerContainerNet --ip $vietclidDatabaseContainerIP  --name $vietclidDatabaseContainerName -v $databaseServerConfigurationDir:/etc/mysql/conf.d -v $userDataDir:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=$mysqlRootPassword -d $databaseImage
+    docker run --restart=always --net $dockerContainerNet --ip $vietclidDatabaseContainerIP  --name $vietclidDatabaseContainerName -v $databaseServerConfigurationDir:/etc/mysql/conf.d -v $databaseServerDataDir:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=$mysqlRootPassword -d $databaseImage
 
     #Write root password to log
     echo $mysqlRootPassword > $databaseServerLogDir/mysql-root-pw.txt
 
-    echo -e $"[RUNNING] root password was written on ${databaseServerLogDir}/mysql-root-pw.txt \n"
-    echo -e $"Connect by SSH: mysql -h$vietclidDatabaseContainerIP -P3306 -uroot -p"$mysqlRootPasswordl" \n"
+    echo -e $"-------------------------|root password was written on ${databaseServerLogDir}/mysql-root-pw.txt \n"
+    echo -e $"-------------------------|Connect by SSH: mysql -h$vietclidDatabaseContainerIP -P3306 -uroot -p"$mysqlRootPasswordl" \n"
 
 fi
 
@@ -253,8 +254,8 @@ then
 
     ## Create log folder
     if ! [ -d $logDir ]; then
+        echo $"[RUNNING] Creating log folder $logDir"
         mkdir $logDir
-        echo $"Created log folder $logDir"
     fi
 
     ## Create docker container
@@ -290,27 +291,26 @@ then
         if [ $SUDO_USER ];
         then
             chown -R $SUDO_USER:$SUDO_USER $rootDir
-            echo -e $"Set owner by SUDO_USER with value $SUDO_USER for $rootDir \n"
         elif [ $(whoami) ];
         then
             chown -R $(whoami):$(whoami) $rootDir
-            echo -e $"Set owner by whoami with value $(whoami) for $rootDir \n"
         fi
 
     else
         chown -R $owner:$owner $rootDir
-        echo -e $"Set owner by owner with value $owner for $rootDir \n"
     fi
 
     # Create Database
     echo -e $"[RUNNING] Create Database... \n "
     if [ ! "$(docker ps | grep \"$vietclidDatabaseContainerName\")" ]; then
         docker start $vietclidDatabaseContainerName
+        echo -e $"============================================== \n"
         echo -e $"Creating Database : ${domain//./} \n"
         echo -e $"Database Host : $vietclidDatabaseContainerIP port 3306 \n"
         echo -e $"Username / Password : root / $vietclidDefaultPassword \n"
         echo -e $"Database Name : root / $vietclidDefaultPassword \n"
         echo -e $"Usage:  mysql -h$vietclidDatabaseContainerIP -P3306 -uroot -p$vietclidDefaultPassword ${domain//./}\n"
+        echo -e $"============================================== \n"
 
         docker start $vietclidDatabaseContainerName
         mysql -h$vietclidDatabaseContainerIP -P3306 -uroot -p"$vietclidDefaultPassword" --execute="CREATE DATABASE ${domain//./};"
