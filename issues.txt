@@ -1,0 +1,4 @@
+* crash comment when running
+* Cannot delete database
+* slow queries log monitor
+* xdebug

@@ -210,6 +210,18 @@ innodb_data_file_path = ibdata1:10M:autoextend:max:1024M
 tmp_table_size = 1024M
 max_heap_table_size = 1024M
 explicit_defaults_for_timestamp = 1
+
+# What's the threshold for a slow query to be logged?
+long_query_time = 0.5
+
+# Where should the queries be logged to?
+slow_query_log_file = /var/log/mysql/mysql-slow.log
+
+# Enable slow query logging - note the dashes rather than underscores
+slow-query-log = 1
+
+# Not using indexes regardless of the setting in long_query_time
+#log-queries-not-using-indexes
 EOF
 
         chmod 755 -R $databaseServerConfigurationDir
@@ -235,13 +247,15 @@ EOF
     fi
 
     ### Create docker container
-    docker run --restart=always --net $dockerContainerNet --ip $vietclidDatabaseContainerIP  --name $vietclidDatabaseContainerName -v $databaseServerConfigurationDir:/etc/mysql/conf.d -v $databaseServerDataDir:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=$mysqlRootPassword -d $databaseImage
+    ##docker run --restart=always --net $dockerContainerNet --ip $vietclidDatabaseContainerIP  --name $vietclidDatabaseContainerName -v $databaseServerConfigurationDir:/etc/mysql/conf.d -v $databaseServerDataDir:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=$mysqlRootPassword -d $databaseImage
+    docker run --restart=always --net $dockerContainerNet --ip $vietclidDatabaseContainerIP  --name $vietclidDatabaseContainerName -v $databaseServerConfigurationDir:/etc/mysql/conf.d -v $databaseServerLogDir:/var/log/mysql -v $databaseServerDataDir:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=$mysqlRootPassword -d $databaseImage
+    docker run exec $vietclidDatabaseContainerName chown mysql:root /var/log/mysql
 
     #Write root password to log
     echo $mysqlRootPassword > $databaseServerLogDir/mysql-root-pw.txt
 
     echo -e $"-------------------------|root password was written on ${databaseServerLogDir}/mysql-root-pw.txt \n"
-    echo -e $"-------------------------|Connect by SSH: mysql -h$vietclidDatabaseContainerIP -P3306 -uroot -p"$mysqlRootPasswordl" \n"
+    echo -e $"-------------------------|Connect by SSH: mysql -h$vietclidDatabaseContainerIP -P3306 -uroot -p"$mysqlRootPassword" \n"
 
 fi
 
