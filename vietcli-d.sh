@@ -23,8 +23,7 @@ databaseImage='mysql:latest'
 ### don't modify from here unless you know what you are doing ####
 
 
-## Step 1 ##
-echo $"[Step 1] Check root permission"
+## Step 1 Check root permission##
 
 if [ "$(whoami)" != 'root' ];
 then
@@ -32,8 +31,7 @@ then
     exit 1;
 fi
 
-## Step 2 ##
-echo $"[Step 2] Check action request"
+## Step 2 Check action request ##
 
 if [ "$action" != 'create' ] && [ "$action" != 'delete' ] && [ "$action" != 'ifconfig' ]; then
     echo $"You need to prompt for action (create, createmage2, ifconfig or delete) -- Lower-case only"
@@ -41,19 +39,27 @@ if [ "$action" != 'create' ] && [ "$action" != 'delete' ] && [ "$action" != 'ifc
 fi
 
 
-## Step 3 ##
-echo $"[Step 3] Check docker if installed"
+## Step 3 Check docker if installed##
 
 ###Check if docker was installed###
 which docker
 
 if [ $? -ne 0 ]
 then
-    echo $"You need to install docker before try again \n"
-    echo $"Installing docker by below:\n"
-    echo $"sudo apt-get install docker.io \n"
-    echo $"sudo usermod -aG docker $(whoami) \n"
-    exit 1;
+    if lsb_release -s -d | grep -q "Ubuntu 16.04"; then
+        echo $"Installing docker..."
+        apt-get update
+        apt-get install docker.io
+        usermod -aG docker $SUDO_USER
+
+    else
+        echo $"You need to install docker before try again"
+        echo $"Installing docker by below:"
+        echo $"sudo apt-get install docker.io"
+        echo $"sudo usermod -aG docker $SUDO_USER"
+        exit 1;
+
+    fi
 else
     docker --version | grep "Docker version"
 
@@ -66,23 +72,38 @@ else
     ## Set docker permission for current user
     usermod -aG docker $SUDO_USER
 
-
 fi
 
-## Step 3 ##
-echo $"[Step 4] Check mysql if installed \n"
+## Step 4 Check mysql if installed ##
 
 ### Check if mysql is installed ###
 if ! type mysql >/dev/null 2>&1; then
-    echo $"You need to install mysql before try again. \n"
-    exit 1;
+    if lsb_release -s -d | grep -q "Ubuntu 16.04"; then
+        echo $"Installing mysql-client..."
+        apt-get update
+        apt-get install mysql-client
+
+    else
+        echo $"You need to install mysql before try again."
+        exit 1;
+
+    fi
 
 fi
 
 ## Install pwgen to generate random password
 
 if ! which pwgen > /dev/null; then
-    apt-get install pwgen
+    if lsb_release -s -d | grep -q "Ubuntu 16.04"; then
+        echo $"Installing pwgen..."
+        apt-get update
+        apt-get install pwgen
+
+    else
+        echo $"You need to install pwgen before try again."
+        exit 1;
+
+    fi
 fi
 
 while [ "$domain" == "" ]
@@ -357,9 +378,9 @@ else
         fi
 
         ###Remove Database
-        if ! mysql -h$vietclidDatabaseContainerIP -P3306 -uroot -p"$vietclidDefaultPassword" -e 'use ${domain//./}'; then
+        if ! mysql -h$vietclidDatabaseContainerIP -P3306 -uroot -p"$vietclidDefaultPassword" -e "use ${domain//./}"; then
 
-            echo -e $"Delete docker container $domain ? (y/n)"
+            echo -e $"Delete database ${domain//./} ? (y/n)"
             read deldir
 
             if [ "$deldir" == 'y' -o "$deldir" == 'Y' ]; then
