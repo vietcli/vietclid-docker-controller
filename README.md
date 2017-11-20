@@ -5,7 +5,7 @@ VietCLID is an edition of VietCLI for Docker container. It used vietduong/centos
 ### Installation
 
 ```
-$ sudo bash -c "curl -sSL https://raw.githubusercontent.com/vietcli/vietclid-docker-controller/master/vietcli-d.sh > /usr/local/sbin/vietcli-d"
+$ sudo bash -c "wget -O /usr/local/sbin/vietcli-d https://raw.githubusercontent.com/vietcli/vietclid-docker-controller/master/vietcli-d.sh && chmod +x /usr/local/sbin/vietcli-d"
 ``` 
 OR
 ```
