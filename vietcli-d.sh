@@ -55,7 +55,11 @@ then
     else
         echo $"You need to install docker before try again"
         echo $"Installing docker by below:"
-        echo $"sudo apt-get install docker.io"
+        echo $"sudo apt-get update"
+        echo $"sudo apt-get install --no-install-recommends apt-transport-https curl software-properties-common"
+        echo $"sudo curl -fsSL 'https://sks-keyservers.net/pks/lookup?op=get&search=0xee6d536cf7dc86e2d7d56f59a178ac6c6238f52e' | sudo apt-key add -"
+        echo $"sudo add-apt-repository \"deb https://packages.docker.com/1.13/apt/repo/ ubuntu-$(lsb_release -cs) main\""
+        echo $"sudo apt-get -y install docker-engine"
         echo $"sudo usermod -aG docker $SUDO_USER"
         exit 1;
 
@@ -65,7 +69,7 @@ else
 
     if [ $? -ne 0 ]
     then
-        echo $"You need to install docker before try again"
+        echo $"You need to install docker before try again (Tested with Docker 1.13.1"
         exit 1;
     fi
 
