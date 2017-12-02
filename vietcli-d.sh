@@ -210,10 +210,11 @@ then
 
         cat > $databaseServerConfigurationDir/vietcli.cnf << "EOF"
 [mysqld]
-innodb_data_file_path = ibdata1:10M:autoextend:max:1024M
-tmp_table_size = 1024M
-max_heap_table_size = 1024M
+innodb_data_file_path = ibdata1:10M:autoextend:max:4096M
+tmp_table_size = 4096M
+max_heap_table_size = 4096M
 explicit_defaults_for_timestamp = 1
+innodb_lock_wait_timeout=360
 
 # What's the threshold for a slow query to be logged?
 long_query_time = 0.5
