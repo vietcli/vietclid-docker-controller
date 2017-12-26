@@ -215,6 +215,7 @@ tmp_table_size = 4096M
 max_heap_table_size = 4096M
 explicit_defaults_for_timestamp = 1
 innodb_lock_wait_timeout=360
+sql_mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
 
 # What's the threshold for a slow query to be logged?
 long_query_time = 0.5
@@ -261,6 +262,7 @@ EOF
 
     echo -e $"-------------------------|root password was written on ${databaseServerLogDir}/mysql-root-pw.txt \n"
     echo -e $"-------------------------|Connect by SSH: mysql -h$vietclidDatabaseContainerIP -P3306 -uroot -p"$mysqlRootPassword" \n"
+    echo -e $"-------------------------|Connect by SSH: docker exec -it $vietclidDatabaseContainerName bash \n"
 
 fi
 
