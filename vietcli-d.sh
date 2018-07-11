@@ -1,5 +1,10 @@
 #!/bin/bash
 
+### Compatible with:
+##  OS: Ubuntu 16
+##  WEB: webbase-image:stable
+##  MYSQL: mysql:5.7.22
+
 ### Set default parameters
 action=$1
 domain=$2
