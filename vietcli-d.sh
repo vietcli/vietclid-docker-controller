@@ -18,8 +18,7 @@ vietclidDatabaseContainerIP='172.18.0.2'
 
 ##Docker base images
 vietcliWebsaseImage='vietduong/vietcli-webbase-image'
-#databaseImage='mysql:latest'
-databaseImage='mysql:5.7.22'
+databaseImage='mysql:latest'
 
 ### don't modify from here unless you know what you are doing ####
 
