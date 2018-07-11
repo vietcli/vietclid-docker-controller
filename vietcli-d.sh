@@ -18,7 +18,8 @@ vietclidDatabaseContainerIP='172.18.0.2'
 
 ##Docker base images
 vietcliWebsaseImage='vietduong/vietcli-webbase-image'
-databaseImage='mysql:latest'
+#databaseImage='mysql:latest'
+databaseImage='mysql:5.7.22'
 
 ### don't modify from here unless you know what you are doing ####
 
@@ -88,7 +89,8 @@ if ! type mysql >/dev/null 2>&1; then
         apt-get install mysql-client
 
     else
-        echo $"You need to install mysql before try again."
+        echo $"You need to install mysql-client before try again. Let try below command:"
+        echo $"sudo apt-get -y install mysql-client"
         exit 1;
 
     fi
@@ -105,6 +107,7 @@ if ! which pwgen > /dev/null; then
 
     else
         echo $"You need to install pwgen before try again."
+        echo $"sudo apt-get -y install pwgen"
         exit 1;
 
     fi
@@ -182,7 +185,7 @@ then
 
     ## Create database log folder
     databaseServerLogDir=$"${userLogDir}/${vietclidDatabaseContainerName}"
-
+mysql
     if [ ! -d "$databaseServerLogDir" ]; then
         mkdir $databaseServerLogDir
 
