@@ -3,28 +3,12 @@
 VietCLID is an edition of VietCLI for Docker container. It used vietduong/centos-nginx-phpfpm as default docker image.
 
 ### Installation
-Using WGET
 
-```
-$ sudo bash -c "wget -O /usr/local/sbin/vietcli-d https://raw.githubusercontent.com/vietcli/vietclid-docker-controller/master/vietcli-d.sh && chmod +x /usr/local/sbin/vietcli-d"
-``` 
-OR
-```
-$ wget -q --no-check-certificate https://raw.githubusercontent.com/vietcli/vietclid-docker-controller/master/vietcli-d.sh
-$ chmod +x vietcli-d.sh
-$ sudo mv vietcli-d.sh /usr/local/sbin/vietcli-d
-```
-Using CURL
+Instalation: 
 
-```
-$ sudo bash -c "curl -L https://raw.githubusercontent.com/vietcli/vietclid-docker-controller/master/vietcli-d.sh -o /usr/local/sbin/vietcli-d && chmod +x /usr/local/sbin/vietcli-d"
+```$xslt
+$ bash <(wget -O - https://raw.githubusercontent.com/vietcli/vietclid-docker-controller/master/installer.sh 2>/dev/null || curl -s https://raw.githubusercontent.com/vietcli/vietclid-docker-controller/master/installer.sh )
 ``` 
-OR
-```
-$ curl -L https://raw.githubusercontent.com/vietcli/vietclid-docker-controller/master/vietcli-d.sh
-$ chmod +x vietcli-d.sh
-$ sudo mv vietcli-d.sh /usr/local/sbin/vietcli-d
-```
 
 ### Usage
 
