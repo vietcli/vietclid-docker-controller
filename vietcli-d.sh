@@ -1,9 +1,44 @@
 #!/bin/bash
 
 ### Compatible with:
-##  OS: Ubuntu 16
+##  OS: Ubuntu 16 / 18
 ##  WEB: webbase-image:stable
 ##  MYSQL: mysql:latest
+
+
+## Display Usage Statement
+function displayVietcliUsageStatement()
+{
+    cat <<'EOFFOE'
+
+Usage:      vietcli-d [Action] [Domain] [rootDir] [-t=*|--type=*] [-i=*|--image=*] [-m=*|--memory=*] [--memory-swap=*] [--memory-swappiness=*] [-h|--help|--list]
+
+Purpose:    Provide docker container for wordpress/magento1/magento2 .. or by custom docker image.
+
+  Action                    create | delete | ifconfig
+  -h                        Show HELP (this output)
+  -t=*|--type=*             wp | m1 | m2
+                            TYPE of project. we provide docker for Wordpress/Magento1/Magento2 project
+  -m=*|--memory=*           The maximum amount of memory the container can use. Default is 256MB.
+                            If you set this option, the minimum allowed value is 4m (4 megabyte).
+  --memory-swap=*           The amount of memory this container is allowed to swap to disk.
+  --memory-swappiness=*     By default, the host kernel can swap out a percentage of anonymous pages used
+                            by a container. You can set --memory-swappiness to a value between 0 and 100,
+                            to tune this percentage.
+  -i=*|--image=*            DOCKER IMAGE. Use this option, in case you want to create a docker
+                            image with custom docker image.
+
+Tested on:
+            OS: Ubuntu 16/18
+            Docker version 18.06.1-ce
+
+Example:
+            $ vietcli-d create dev.livedomain.com -t=m2
+            $ vietcli-d create dev.datacenter.com -i=mysql/mysql-server
+
+EOFFOE
+
+}
 
 ### Set default parameters
 action=$1
@@ -23,10 +58,65 @@ vietclidDatabaseContainerIP='172.18.0.2'
 
 ##Docker base images
 vietcliWebsaseImage='vietduong/vietcli-webbase-image'
+vietcliDefaultType='m2'
 databaseImage='mysql:latest'
 
 ### don't modify from here unless you know what you are doing ####
 
+## Step 0 check arguments
+
+for i in "$@"
+do
+case $i in
+    -t=*|--type=*)
+    TYPE="${i#*=}"
+    shift # past argument=value
+    ;;
+    -i=*|--image=*)
+    DOCKER_IMAGE="${i#*=}"
+    shift # past argument=value
+    ;;
+    -m=*|--memory=*)
+    MEMORY="${i#*=}"
+    shift # past argument=value
+    ;;
+    --memory-swap=*)
+    MEMORY_SWAP="${i#*=}"
+    shift # past argument=value
+    ;;
+    --memory-swappiness=*)
+    MEMORY_SWAPPINESS="${i#*=}"
+    shift # past argument=value
+    ;;
+    --default)
+    DEFAULT=YES
+    TYPE=m2
+    shift # past argument with no value
+    ;;
+    -h|--help|--list)
+    displayVietcliUsageStatement
+    ;;
+    *)
+    DEFAULT=YES
+    TYPE=m2
+          # unknown option
+    ;;
+esac
+done
+
+memoryOptions='';
+
+if [ -n "${MEMORY}" ]; then
+    memoryOptions+=" --memory=${MEMORY}"
+fi
+
+if [ -n "${MEMORY_SWAP}" ]; then
+    memoryOptions+=" --memory-swap=${MEMORY_SWAP}"
+fi
+
+if [ -n "${MEMORY_SWAPPINESS}" ]; then
+    memoryOptions+=" --memory-swappiness=${MEMORY_SWAPPINESS}"
+fi
 
 ## Step 1 Check root permission##
 
@@ -38,7 +128,7 @@ fi
 
 ## Step 2 Check action request ##
 
-if [ "$action" != 'create' ] && [ "$action" != 'delete' ] && [ "$action" != 'ifconfig' ]; then
+if [ "$action" != 'create' ] && [ "$action" != 'delete' ] && [ "$action" != 'remove' ] && [ "$action" != 'ifconfig' ]; then
     echo $"You need to prompt for action (create, createmage2, ifconfig or delete) -- Lower-case only"
     exit 1;
 fi
@@ -92,6 +182,11 @@ if ! type mysql >/dev/null 2>&1; then
         apt-get update
         apt-get install mysql-client
 
+    elif lsb_release -s -d | grep -q "Ubuntu 18.04"; then
+        echo $"Installing mysql-client..."
+        apt-get update
+        apt-get install mysql-client
+
     else
         echo $"You need to install mysql-client before try again. Let try below command:"
         echo $"sudo apt-get -y install mysql-client"
@@ -105,6 +200,11 @@ fi
 
 if ! which pwgen > /dev/null; then
     if lsb_release -s -d | grep -q "Ubuntu 16.04"; then
+        echo $"Installing pwgen..."
+        apt-get update
+        apt-get install pwgen
+
+    elif lsb_release -s -d | grep -q "Ubuntu 18.04"; then
         echo $"Installing pwgen..."
         apt-get update
         apt-get install pwgen
@@ -308,8 +408,16 @@ then
     fi
 
     ## Create docker container
-    echo -e $"[RUNNING] docker run --net $dockerContainerNet --ip $dockerContainerIp -v $logDir:/home/vietcli/.log -v $rootDir:/home/vietcli/files -e HTTP_SERVER_NAME=$domain --name $domain -d $vietcliWebsaseImage"
-    id=$(docker run --net $dockerContainerNet --ip $dockerContainerIp -v $logDir:/home/vietcli/.log -v $rootDir:/home/vietcli/files -e HTTP_SERVER_NAME=$domain --name $domain -d $vietcliWebsaseImage)
+
+    if [ -z "${DOCKER_IMAGE}" ]; then
+        echo -e $"[RUNNING] docker run $memoryOptions --net $dockerContainerNet --ip $dockerContainerIp -v $logDir:/home/vietcli/.log -v $rootDir:/home/vietcli/files -e HTTP_SERVER_NAME=$domain --name $domain -d $vietcliWebsaseImage:$TYPE"
+        id=$(docker run $memoryOptions --net $dockerContainerNet --ip $dockerContainerIp -v $logDir:/home/vietcli/.log -v $rootDir:/home/vietcli/files -e HTTP_SERVER_NAME=$domain --name $domain -d $vietcliWebsaseImage:$TYPE)
+
+    else
+        echo -e $"[RUNNING] docker run $memoryOptions --net $dockerContainerNet --ip $dockerContainerIp --name $domain -d $DOCKER_IMAGE"
+        id=$(docker run $memoryOptions --net $dockerContainerNet --ip $dockerContainerIp --name $domain -d $DOCKER_IMAGE)
+
+    fi
 
     if ! docker top $id &>/dev/null
     then
@@ -327,12 +435,17 @@ then
     else
         echo -e $"Host added to /etc/hosts file \n"
 
-        if [ -d $logDir ]; then
-            echo -e $"Log files will write down on $logDir \n"
+        if [ -z "${DOCKER_IMAGE}" ]; then
+
+            if [ -d $logDir ]; then
+                echo -e $"Log files will write down on $logDir \n"
+            fi
+
+            echo -e $"Now you can access by default with account vietcli (pass: vietcli) \n"
+            echo -e $"ssh vietcli@$dockerContainerIp \n"
+
         fi
 
-        echo -e $"Now you can access by default with account vietcli (pass: vietcli) \n"
-        echo -e $"ssh vietcli@$dockerContainerIp \n"
     fi
 
     if [ "$owner" == "" ]; then
@@ -409,12 +522,11 @@ else
         if ! mysql -h$vietclidDatabaseContainerIP -P3306 -uroot -p"$vietclidDefaultPassword" -e "use ${domain//./}"; then
 
             echo -e $"Delete database ${domain//./} ? (y/n)"
-            read deldir
+            read delData
 
-            if [ "$deldir" == 'y' -o "$deldir" == 'Y' ]; then
-
+            if [ "$delData" == 'y' -o "$delData" == 'Y' ]; then
                 mysql -h$vietclidDatabaseContainerIP -P3306 -uroot -p"$vietclidDefaultPassword" --execute="DROP DATABASE ${domain//./};"
-                echo -e $"Dropped"
+                echo -e $"Dropped ${domain//./}"
 
             fi
 
