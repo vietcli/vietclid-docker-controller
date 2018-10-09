@@ -49,15 +49,23 @@ email='webmaster@lvietclidbocalhost'
 userDir=$"/home/$SUDO_USER/vietclid/"
 userDataDir=$"/home/$SUDO_USER/vietclid/data"
 userLogDir=$"/home/$SUDO_USER/vietclid/log"
+userSampleDir=$"/home/$SUDO_USER/vietclid/sample"
 userConfigurationDir=$"/home/$SUDO_USER/vietclid/conf.d"
 vietclidDefaultPassword='vietcli'
 vietclidNet='vietclidNet'
 vietclidNetIp='172.18.0.1'
 vietclidDatabaseContainerName='vietclid-database-server'
 vietclidDatabaseContainerIP='172.18.0.2'
+vietclidRoutingContainerName='vietclid-routing-server'
+vietclidRoutingContainerIP='172.18.0.3'
 
 ##Docker base images
 vietcliWebsaseImage='vietduong/vietcli-webbase-image'
+
+##Docker routing image for nginx 1.15.x
+vietcliRoutingImage='vietduong/vietcli-docker-routing:nginx_1.15.x'
+vietcliRoutingSampleConfName='vietcli.local.conf'
+
 vietcliDefaultType='m2'
 databaseImage='mysql:latest'
 
@@ -273,6 +281,9 @@ then
     ### Create a directory for configuration
     mkdir $userConfigurationDir
 
+    ### Create a directory for sample files
+    mkdir $userSampleDir
+
     ### give permission to root dir
     chmod 755 -R $userDir
     chown $SUDO_USER:$SUDO_USER -R $userDir
@@ -289,7 +300,7 @@ then
 
     ## Create database log folder
     databaseServerLogDir=$"${userLogDir}/${vietclidDatabaseContainerName}"
-mysql
+
     if [ ! -d "$databaseServerLogDir" ]; then
         mkdir $databaseServerLogDir
 
@@ -362,7 +373,7 @@ EOF
     ### Create docker container
     ##docker run --restart=always --net $dockerContainerNet --ip $vietclidDatabaseContainerIP  --name $vietclidDatabaseContainerName -v $databaseServerConfigurationDir:/etc/mysql/conf.d -v $databaseServerDataDir:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=$mysqlRootPassword -d $databaseImage
     docker run --restart=always --net $dockerContainerNet --ip $vietclidDatabaseContainerIP  --name $vietclidDatabaseContainerName -v $databaseServerConfigurationDir:/etc/mysql/conf.d -v $databaseServerLogDir:/var/log/mysql -v $databaseServerDataDir:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=$mysqlRootPassword -d $databaseImage
-    docker run exec $vietclidDatabaseContainerName chown mysql:root /var/log/mysql
+    docker exec $vietclidDatabaseContainerName chown mysql:root /var/log/mysql
 
     #Write root password to log
     echo $mysqlRootPassword > $databaseServerLogDir/mysql-root-pw.txt
@@ -370,6 +381,39 @@ EOF
     echo -e $"-------------------------|root password was written on ${databaseServerLogDir}/mysql-root-pw.txt \n"
     echo -e $"-------------------------|Connect by SSH: mysql -h$vietclidDatabaseContainerIP -P3306 -uroot -p"$mysqlRootPassword" \n"
     echo -e $"-------------------------|Connect by SSH: docker exec -it $vietclidDatabaseContainerName bash \n"
+
+fi
+
+### Check if docker routing image was installed ###
+
+if [ ! "$(docker ps -a | grep ${vietclidRoutingContainerName})" ];
+then
+    echo -e $"[RUNNING] Creating routing server container \n"
+
+    ## Create routing server log folder
+    routingServerLogDir=$"${userLogDir}/${vietclidRoutingContainerName}"
+
+    ## Create routing server nginx site configuration folder
+    routingServerNginxConfDir=$"${userConfigurationDir}/${vietclidRoutingContainerName}"
+
+    if [ ! -d "$routingServerNginxConfDir" ]; then
+        mkdir $routingServerNginxConfDir
+        cd $routingServerNginxConfDir
+        wget https://raw.githubusercontent.com/vietcli/vietcli-docker-routing/nginx_1.15.x/default.conf || curl -O https://raw.githubusercontent.com/vietcli/vietcli-docker-routing/nginx_1.15.x/default.conf
+    fi
+
+    ### Create docker routing container
+    # routingDocker=$(docker run --restart=always --net $dockerContainerNet --ip $vietclidRoutingContainerIP -v $routingServerLogDir:/home/vietcli/.log --name $vietclidRoutingContainerName -d $vietcliRoutingImage)
+#    routingDocker=$(docker run --restart=always --net $dockerContainerNet --ip $vietclidRoutingContainerIP -v $routingServerNginxConfDir:/etc/nginx/conf.d -v $routingServerLogDir:/home/vietcli/.log --name $vietclidRoutingContainerName -d $vietcliRoutingImage)
+    routingDocker=$(docker run --restart=always --net $dockerContainerNet --ip $vietclidRoutingContainerIP -p 80:80 -p 443:443 -v $routingServerNginxConfDir:/etc/nginx/conf.d -v $routingServerLogDir:/home/vietcli/.log --name $vietclidRoutingContainerName -d $vietcliRoutingImage)
+
+    if ! docker top $routingDocker &>/dev/null
+    then
+        echo -e $"There is an ERROR creating $vietclidRoutingContainerName container"
+        exit;
+    else
+        echo -e $"\n$vietclidRoutingContainerName Created on Docker\n"
+    fi
 
 fi
 
@@ -426,6 +470,26 @@ then
     else
         echo -e $"\nNew Virtual Host Created on Docker\n"
     fi
+
+    ### Add domain to routing server
+
+    routingSampleFile=$"${userSampleDir}/${vietcliRoutingSampleConfName}"
+
+    #### Download sample file if it is not exist
+    if [ ! -f $routingSampleFile ]; then
+        cd $userSampleDir
+        echo -e $"\nDownload sample routing config\n"
+        wget https://raw.githubusercontent.com/vietcli/vietcli-docker-routing/nginx_1.15.x/vietcli.local.conf || curl -O https://raw.githubusercontent.com/vietcli/vietcli-docker-routing/nginx_1.15.x/vietcli.local.conf
+    fi
+
+    #### Create new routing file
+    routingDomainFile=$"${routingServerNginxConfDir}/${domain}.conf"
+    cp $routingSampleFile $routingDomainFile
+    sed -i "s/__CUSTOM_VIETCLI_DOMAIN__/${domain}/" $routingDomainFile
+    sed -i "s/__CUSTOM_VIETCLI_ROUTING_IP__/${dockerContainerIp}/" $routingDomainFile
+
+    #### Restart Routing Server
+    docker exec $vietclidRoutingContainerName service nginx restart
 
     ### Add domain in /etc/hosts
     if ! echo "$dockerContainerIp	$domain" >> /etc/hosts
@@ -488,6 +552,14 @@ then
     docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $domain
 
 else
+
+    #### Remove routing file
+    routingDomainFile=$"${routingServerNginxConfDir}/${domain}.conf"
+    rm $routingDomainFile
+
+    #### Restart Routing Server
+    docker exec $vietclidRoutingContainerName service nginx restart
+
     ### check whether domain already exists
     if ! grep -qs $domain /etc/hosts
     then
