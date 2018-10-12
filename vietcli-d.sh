@@ -398,8 +398,8 @@ then
 
     if [ ! -d "$routingServerNginxConfDir" ]; then
         mkdir $routingServerNginxConfDir
-        cd $routingServerNginxConfDir
-        wget https://raw.githubusercontent.com/vietcli/vietcli-docker-routing/nginx_1.15.x/default.conf || curl -O https://raw.githubusercontent.com/vietcli/vietcli-docker-routing/nginx_1.15.x/default.conf
+#        cd $routingServerNginxConfDir
+#        wget https://raw.githubusercontent.com/vietcli/vietcli-docker-routing/nginx_1.15.x/default.conf || curl -O https://raw.githubusercontent.com/vietcli/vietcli-docker-routing/nginx_1.15.x/default.conf
     fi
 
     ### Create docker routing container
@@ -449,6 +449,8 @@ then
     if ! [ -d $logDir ]; then
         echo $"[RUNNING] Creating log folder $logDir"
         mkdir $logDir
+        dockerContainerIP=$"${logDir}/${dockerContainerIp}"
+        touch $dockerContainerIP
     fi
 
     ## Create docker container
@@ -492,7 +494,8 @@ then
     docker exec $vietclidRoutingContainerName service nginx restart
 
     ### Add domain in /etc/hosts
-    if ! echo "$dockerContainerIp	$domain" >> /etc/hosts
+#    if ! echo "$dockerContainerIp	$domain" >> /etc/hosts
+    if ! echo "127.0.0.1	$domain" >> /etc/hosts
     then
         echo $"ERROR: Not able to write in /etc/hosts"
         exit;
