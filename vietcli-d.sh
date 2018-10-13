@@ -15,7 +15,7 @@ Usage:      vietcli-d [Action] [Domain] [rootDir] [-t=*|--type=*] [-i=*|--image=
 
 Purpose:    Provide docker container for wordpress/magento1/magento2 .. or by custom docker image.
 
-  Action                    create | delete | ifconfig
+  Action                    create | delete | view-ip | restart-nginx
   -h                        Show HELP (this output)
   -t=*|--type=*             wp | m1 | m2
                             TYPE of project. we provide docker for Wordpress/Magento1/Magento2 project
@@ -51,6 +51,7 @@ userDataDir=$"/home/$SUDO_USER/vietclid/data"
 userLogDir=$"/home/$SUDO_USER/vietclid/log"
 userSampleDir=$"/home/$SUDO_USER/vietclid/sample"
 userConfigurationDir=$"/home/$SUDO_USER/vietclid/conf.d"
+userVietcliHosts=$"/home/$SUDO_USER/vietclid/hosts"
 vietclidDefaultPassword='vietcli'
 vietclidNet='vietclidNet'
 vietclidNetIp='172.18.0.1'
@@ -66,8 +67,14 @@ vietcliWebsaseImage='vietduong/vietcli-webbase-image'
 vietcliRoutingImage='vietduong/vietcli-docker-routing:nginx_1.15.x'
 vietcliRoutingSampleConfName='vietcli.local.conf'
 
-vietcliDefaultType='m2'
+vietcliDefaultType='default'
 databaseImage='mysql:latest'
+
+## Routing server log folder
+routingServerLogDir=$"${userLogDir}/${vietclidRoutingContainerName}"
+
+## Routing server nginx site configuration folder
+routingServerNginxConfDir=$"${userConfigurationDir}/${vietclidRoutingContainerName}"
 
 ### don't modify from here unless you know what you are doing ####
 
@@ -98,7 +105,7 @@ case $i in
     ;;
     --default)
     DEFAULT=YES
-    TYPE=m2
+    TYPE=$"${vietcliDefaultType}"
     shift # past argument with no value
     ;;
     -h|--help|--list)
@@ -106,7 +113,7 @@ case $i in
     ;;
     *)
     DEFAULT=YES
-    TYPE=m2
+    TYPE=$"${vietcliDefaultType}"
           # unknown option
     ;;
 esac
@@ -136,7 +143,7 @@ fi
 
 ## Step 2 Check action request ##
 
-if [ "$action" != 'create' ] && [ "$action" != 'delete' ] && [ "$action" != 'remove' ] && [ "$action" != 'ifconfig' ]; then
+if [ "$action" != 'create' ] && [ "$action" != 'delete' ] && [ "$action" != 'remove' ] && [ "$action" != 'restart-nginx' ] && [ "$action" != 'view-ip' ]; then
     echo $"You need to prompt for action (create, createmage2, ifconfig or delete) -- Lower-case only"
     exit 1;
 fi
@@ -256,7 +263,7 @@ else
     i=11
     while (( i <= 100 ))
     do
-        if ! grep -qs "172.18.0.$i" /etc/hosts;
+        if ! grep -qs "172.18.0.$i" $"${userVietcliHosts}";
         then
             dockerContainerIp="172.18.0.$i"
             dockerContainerNet=$vietclidNet
@@ -390,12 +397,6 @@ if [ ! "$(docker ps -a | grep ${vietclidRoutingContainerName})" ];
 then
     echo -e $"[RUNNING] Creating routing server container \n"
 
-    ## Create routing server log folder
-    routingServerLogDir=$"${userLogDir}/${vietclidRoutingContainerName}"
-
-    ## Create routing server nginx site configuration folder
-    routingServerNginxConfDir=$"${userConfigurationDir}/${vietclidRoutingContainerName}"
-
     if [ ! -d "$routingServerNginxConfDir" ]; then
         mkdir $routingServerNginxConfDir
 #        cd $routingServerNginxConfDir
@@ -486,9 +487,9 @@ then
 
     #### Create new routing file
     routingDomainFile=$"${routingServerNginxConfDir}/${domain}.conf"
-    cp $routingSampleFile $routingDomainFile
-    sed -i "s/__CUSTOM_VIETCLI_DOMAIN__/${domain}/" $routingDomainFile
-    sed -i "s/__CUSTOM_VIETCLI_ROUTING_IP__/${dockerContainerIp}/" $routingDomainFile
+    cp $"${routingSampleFile}" $"${routingDomainFile}"
+    sed -i "s/__CUSTOM_VIETCLI_DOMAIN__/${domain}/" $"${routingDomainFile}"
+    sed -i "s/__CUSTOM_VIETCLI_ROUTING_IP__/${dockerContainerIp}/" $"${routingDomainFile}"
 
     #### Restart Routing Server
     docker exec $vietclidRoutingContainerName service nginx restart
@@ -501,6 +502,12 @@ then
         exit;
     else
         echo -e $"Host added to /etc/hosts file \n"
+
+        if ! echo "$dockerContainerIp	$domain" >> $"${userVietcliHosts}"
+        then
+            echo $"ERROR: Not able to write in ${userVietcliHosts}"
+            exit;
+        fi
 
         if [ -z "${DOCKER_IMAGE}" ]; then
 
@@ -550,15 +557,19 @@ then
     echo -e $"Complete! \nYou now have a new Docker Container Host \nYour new host is: http://$domain \nAnd its located at $rootDir"
     exit;
 
-elif [ "$action" == 'ifconfig' ]
+elif [ "$action" == 'view-ip' ]
 then
     docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $domain
+
+elif [ "$action" == 'restart-nginx' ]
+then
+    docker exec $domain service nginx restart
 
 else
 
     #### Remove routing file
     routingDomainFile=$"${routingServerNginxConfDir}/${domain}.conf"
-    rm $routingDomainFile
+    rm $"${routingDomainFile}"
 
     #### Restart Routing Server
     docker exec $vietclidRoutingContainerName service nginx restart
@@ -572,6 +583,9 @@ else
         ### Delete domain in /etc/hosts
         newhost=${domain//./\\.}
         sed -i "/$newhost/d" /etc/hosts
+
+        ### Delete domain in Vietcli hosts
+        sed -i "/$newhost/d" $"${userVietcliHosts}"
 
         ###Remove docker container
         if [ ! "$(docker ps -a | grep \"$domain\")" ]; then
